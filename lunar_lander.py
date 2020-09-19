@@ -6,7 +6,9 @@ import numpy as np
 from gym import wrappers
 import gym
 import tensorflow.compat.v1 as tf
+import tensorflow
 
+tensorflow.config.experimental_run_functions_eagerly(True)
 sess = tf.Session(config=tf.ConfigProto(
   intra_op_parallelism_threads=24))
 
@@ -39,7 +41,7 @@ class Agent(object):
         
             
         actor = Model([input, delta], [probs])
-        actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss)
+        actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss, experimental_run_tf_function=False)
         critic = Model([input], [values])
         critic.compile(optimizer=Adam(lr=self.beta), loss='mean_squared_error')
         policy = Model([input], [probs])
@@ -61,11 +63,11 @@ class Agent(object):
         target = reward + self.gamma * critic_value_*(1 - int(done))
         delta = target - critic_value
         actions = np.zeros([1, self.n_actions])
-        actions[np.arrange(1), action] = 1.0
+        actions[np.arange(1), action] = 1.0
         
         self.actor.fit([state, delta], actions, verbose=0)
         self.critic.fit(state, target, verbose=0)
-	
+
 if __name__ == '__main__':
     agent = Agent(alpha=0.00001, beta = 0.00005)
     
@@ -83,6 +85,7 @@ if __name__ == '__main__':
         while not done:
             action = agent.choose_action(observation)
             observation_, reward, done, info = env.step(action)
+            agent.learn(observation, action, reward, observation_, done)
             observation = observation_
             score += reward
             env.render()
